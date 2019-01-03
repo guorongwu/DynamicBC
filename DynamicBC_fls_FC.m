@@ -1,8 +1,7 @@
 function [] = DynamicBC_fls_FC(ROI_sig,mu,save_info)
 [nobs,nvar] = size(ROI_sig);
 ROI_sig = zscore(ROI_sig);
-num0 = ceil(log10(nobs))+1;
-FCM = cell(nobs,1); 
+num0 = ceil(log10(nobs))+2;
 % mu=100;
 % tic
 nii_name = cell(nobs,1);
@@ -57,15 +56,18 @@ if save_info.flag_nii % save nii: seed FC,FCD.
 else % save as mat file
     
     beta = zeros(nvar,nvar,nobs); % FC
-    parfor k=1:nvar
+    for k=1:nvar
         betak = zeros(nvar,nobs);
         for j=1:nvar
+%             fprintf('.')
             if j~=k
                 betak(j,:) = wgr_fls(ROI_sig(:,k), ROI_sig(:,j), mu);
             end
         end
         beta(k,:,:) = betak;
+        fprintf('.')
     end
+    fprintf('.\n')
     for k=1:nobs
         FCM.Matrix{k} = (beta(:,:,k)+beta(:,:,k)')/2;
     end
@@ -82,30 +84,70 @@ if save_info.flag_nii % save nii: seed FC,FCD.
         try
             mkdir(pathstr_v)
         end
-        data = zeros(nobs, nvar);
+        data0 = zeros(nobs, nvar);
         for k=1:nobs
             v = spm_vol(nii_name{k,1}.fname);
             dat = spm_read_vols(v);
-            data(k,:) = dat(save_info.index);
+            data0(k,:) = dat(save_info.index);
         end
-        data = var(data,0,1);
-        v.fname = fullfile(pathstr_v,[name,str_typ,ext]);
+        data = var(data0,0,1);
+        v.fname = fullfile(pathstr_v,[name,'_variance',ext]);
         data_save(save_info.index) = data; 
         spm_write_vol(v,data_save);
+        
+        datas = std(data0,0,1);
+        v.fname = fullfile(pathstr_v,[name,'_std',ext]);
+        data_save(save_info.index) = datas; 
+        spm_write_vol(v,data_save);
+        
+        datam = mean(data0,1);
+        v.fname = fullfile(pathstr_v,[name,'_mean',ext]);
+        data_save(save_info.index) = datam; 
+        spm_write_vol(v,data_save);
+        
+        cv = datas./datam;
+        v.fname = fullfile(pathstr_v,[name,'_CV',ext]);
+        data_save(save_info.index) = cv; 
+        spm_write_vol(v,data_save);
+        
+        v.fname = fullfile(pathstr_v,[name,'_CV_abs',ext]);
+        data_save(save_info.index) = abs(cv); 
+        spm_write_vol(v,data_save);
+        
     else
         pathstr_v = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'FC_FLS_Variance',filesep));
         try
             mkdir(pathstr_v)
         end
-        data = zeros(nobs, nvar);
+        data0 = zeros(nobs, nvar);
         for k=1:nobs
             v = spm_vol(nii_name{k,1}.fname);
             dat = spm_read_vols(v);
-            data(k,:) = dat(save_info.index);
+            data0(k,:) = dat(save_info.index);
         end
-        data = var(data,0,1);
-        v.fname = fullfile(pathstr_v,[name,str_typ,ext]);        
+        
+        data = var(data0,0,1);
+        v.fname = fullfile(pathstr_v,[name,'_variance',ext]);
         data_save(save_info.index) = data; 
+        spm_write_vol(v,data_save);
+        
+        datas = std(data0,0,1);
+        v.fname = fullfile(pathstr_v,[name,'_std',ext]);
+        data_save(save_info.index) = datas; 
+        spm_write_vol(v,data_save);
+        
+        datam = mean(data0,1);
+        v.fname = fullfile(pathstr_v,[name,'_mean',ext]);
+        data_save(save_info.index) = datam; 
+        spm_write_vol(v,data_save);
+        
+        cv = datas./datam;
+        v.fname = fullfile(pathstr_v,[name,'_CV',ext]);
+        data_save(save_info.index) = cv; 
+        spm_write_vol(v,data_save);
+        
+        v.fname = fullfile(pathstr_v,[name,'_CV_abs',ext]);
+        data_save(save_info.index) = abs(cv); 
         spm_write_vol(v,data_save);
     end
     
@@ -121,7 +163,7 @@ else
     FCM.variance = data_var;
     
     save_info.nii_mat_name = strrep(save_info.nii_mat_name,save_info.save_dir,fullfile(save_info.save_dir,'FCM',filesep));
-    [fcm_dir,name,ext] = fileparts(save_info.nii_mat_name);
+    [fcm_dir] = fileparts(save_info.nii_mat_name);
     try
         mkdir(fcm_dir)
     end
@@ -141,7 +183,7 @@ for i=1:N
         Ai = X(i,:)'*X(i,:) + mui;
         A(ind,ind)= Ai ;
         A(ind,ind+K)= - mui;
-    elseif i~=1 & i~=N
+    elseif i~=1 && i~=N
         Ai = X(i,:)'*X(i,:) + 2*mui;
         A(ind,ind)= Ai ;
         A(ind,ind+K)= - mui;

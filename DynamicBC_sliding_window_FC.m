@@ -8,24 +8,29 @@ step=ceil(window-overlap*window); % 10% overlap
 if ~step||step<0
     error('you must reset overlap size!');
 end
+if window>nobs
+   fprintf('There are only %d time points < window size = %d',nobs, window)
+   error('you must reset window size!');
+end
 if window==nobs
     slides=1;
 else
     slides=floor((nobs-window)/step)+1;
 end
-num0 = ceil(log10(slides))+1;
+num0 = ceil(log10(slides))+2;
 FC = cell(slides,1);  
 t1=1-step;
 t2=window-step;
 %sliding window 
 nii_name = cell(slides,4);
+
 for k=1:slides
     t1=t1+step;
     t2=t2+step; 
 %     if k==slides
 %         t2 = nobs;
 %     end
-%     disp([t1 t2])
+    disp([t1 t2])
     dat = data(t1:t2,:);
     if save_info.slw_alignment==1
         k1 = t1;
@@ -35,15 +40,16 @@ for k=1:slides
     if save_info.flag_nii % save nii: seed FC,FCD.
         v = save_info.v;
         v.fname = strcat(save_info.nii_mat_name);
-        [pathstr, name, ext] = fileparts(v.fname) ;
-        
-        
+        [pathstr, name, ext] = fileparts(v.fname);       
+       
         num1 = num0 - length(num2str(k1));
         data_save = zeros(save_info.v.dim);
         if ~save_info.flag_1n % FCD
             pathstr_fcd = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'FCD_SW_map',filesep));
-            try
-                mkdir(pathstr_fcd)
+            if k==1
+                try
+                    mkdir(pathstr_fcd)
+                end
             end
             [FCM] = wgr_correl_FCD(dat,nvar, pvalue);
             v.fname = fullfile(pathstr_fcd,[name,'_abs_wei_',repmat('0',1,num1),num2str(k1),ext]);
@@ -75,16 +81,20 @@ for k=1:slides
             end
             data_save(save_info.index) = Matrix;
             pathstr_r = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'seed_CORR_FCmap',filesep));
-            try
-                mkdir(pathstr_r)
+            if k==1
+                try
+                    mkdir(pathstr_r)
+                end
             end
             v.fname = fullfile(pathstr_r,[name,'_',repmat('0',1,num1),num2str(k1),ext]);
             spm_write_vol(v,data_save);
             nii_name{k,1} = v;
             
             pathstr_z = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'seed_Z_FCmap',filesep));
-            try
-                mkdir(pathstr_z)
+            if k==1
+                try
+                    mkdir(pathstr_z)
+                end
             end
             v.fname = fullfile(pathstr_z,['Z_',name,'_',repmat('0',1,num1),num2str(k1),ext]);
             data_save(save_info.index) = atanh(Matrix); %0.5 * log((1 + Matrix)./(1 - Matrix));
@@ -116,38 +126,80 @@ if save_info.flag_nii % save nii: seed FC,FCD.
             mkdir(pathstr_v)
         end
         str_typ = {'_abs_wei_variance','_abs_bin_variance','_pos_wei_variance','_pos_bin_variance'};
+        str_typ2 = {'_abs_wei_std','_abs_bin_std','_pos_wei_std','_pos_bin_std'};
+        str_typ3 = {'_abs_wei_mean','_abs_bin_mean','_pos_wei_mean','_pos_bin_mean'};
+        str_typ4 = {'_abs_wei_CV','_abs_bin_CV','_pos_wei_CV','_pos_bin_CV'};
         for j=1:4
-            data = zeros(slides, nvar);
+            data0 = zeros(slides, nvar);
             for k=1:slides
                 v = spm_vol(nii_name{k,j}.fname);
                 dat = spm_read_vols(v);
-                data(k,:) = dat(save_info.index);
+                data0(k,:) = dat(save_info.index);
             end
-            data = var(data,0,1);
+            datav = var(data0,0,1);
             v.fname = fullfile(pathstr_v,[name,str_typ{j},ext]);
-            data_save(save_info.index) = data; 
+            data_save(save_info.index) = datav; 
             spm_write_vol(v,data_save);
+            
+            datas = std(data0,0,1);
+            v.fname = fullfile(pathstr_v,[name,str_typ2{j},ext]);
+            data_save(save_info.index) = datas; 
+            spm_write_vol(v,data_save);
+            
+            datam = mean(data0,1);
+            v.fname = fullfile(pathstr_v,[name,str_typ3{j},ext]);
+            data_save(save_info.index) = datam; 
+            spm_write_vol(v,data_save);
+            
+            datacv = datas./datam;
+            v.fname = fullfile(pathstr_v,[name,str_typ4{j},ext]);
+            data_save(save_info.index) = datacv; 
+            spm_write_vol(v,data_save);
+
+            v.fname = fullfile(pathstr_v,[name,str_typ4{j},'_abs',ext]);
+            data_save(save_info.index) = abs(datacv); 
+            spm_write_vol(v,data_save);
+            
         end
     else
-        pathstr_v = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'FC_SW_Variance',filesep));
-        try
-            mkdir(pathstr_v)
-        end
-        for j=1:2
-            data = zeros(slides, nvar);
-            for k=1:slides
-                v = spm_vol(nii_name{k,j}.fname);
-                dat = spm_read_vols(v);
-                data(k,:) = dat(save_info.index);
+        if slides>1 
+            pathstr_v = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'FC_SW_Variance',filesep));
+            try
+                mkdir(pathstr_v)
             end
-            data = var(data,0,1);
-            if j==1
-                v.fname = fullfile(pathstr_v,[name,'_variance',ext]);
-            else
-                v.fname = fullfile(pathstr_v,['Z_',name,'_variance',ext]);
+            for j=1:2
+                data0 = zeros(slides, nvar);
+                for k=1:slides
+                    v = spm_vol(nii_name{k,j}.fname);
+                    dat = spm_read_vols(v);
+                    data0(k,:) = dat(save_info.index);
+                end
+                
+                if j==1
+                    prefix = '';
+                else
+                    prefix =  'Z_';
+                end
+                data = var(data0,0,1);
+                v.fname = fullfile(pathstr_v,[prefix,name,'_variance',ext]);
+                data_save(save_info.index) = data; 
+                spm_write_vol(v,data_save);
+                datas = std(data0,0,1);
+                v.fname = fullfile(pathstr_v,[prefix,name,'_std',ext]);
+                data_save(save_info.index) = datas; 
+                spm_write_vol(v,data_save);
+                datam = mean(data0,1);
+                v.fname = fullfile(pathstr_v,[prefix,name,'_mean',ext]);
+                data_save(save_info.index) = datam; 
+                spm_write_vol(v,data_save);
+                cv = datas./datam;
+                v.fname = fullfile(pathstr_v,[prefix,name,'_CV',ext]);
+                data_save(save_info.index) = cv; 
+                spm_write_vol(v,data_save);
+                v.fname = fullfile(pathstr_v,[prefix,name,'_CV_abs',ext]);
+                data_save(save_info.index) = abs(cv); 
+                spm_write_vol(v,data_save);
             end
-            data_save(save_info.index) = data; 
-            spm_write_vol(v,data_save);
         end
     end
     
@@ -172,7 +224,7 @@ if ~save_info.flag_nii
     FCM.time_alignment = time_alignment;
     FCM.variance = data_var;
     save_info.nii_mat_name = strrep(save_info.nii_mat_name,save_info.save_dir,fullfile(save_info.save_dir,'FCM',filesep));
-    [fcm_dir,name,ext] = fileparts(save_info.nii_mat_name);
+    [fcm_dir] = fileparts(save_info.nii_mat_name);
     try
         mkdir(fcm_dir)
     end
@@ -181,7 +233,7 @@ end
 if nargout==1
     varargout{1} = FCM;
 end
-
+clear data0
 
 function [M] = wgr_correl(data,nvar,flag_1n, pvalue,seed_signal,m)
 % Compute correlation matrix A.
@@ -303,17 +355,16 @@ else
         comm = {'abs(matrixs);MA = MA.*(MA>r_th); MA = atanh(MA); MA(isinf(MA)) = 0','matrixs.*(matrixs>r_th); MA = atanh(MA); MA(isinf(MA)) = 0','abs(matrixs)>r_th','matrixs>r_th'};
         comm_str = {'fcd_abs_wei','fcd_pos_wei','fcd_abs_bin','fcd_pos_bin'};
         MA = zeros(length(ind_X),nvar);
-        for i=1:length(comm)
-            if i<3
-                str_commond = ['MA = ',comm{i},'; M.',comm_str{i},'(ind_X,1) = sum(MA,2);'];
+        for i0=1:length(comm)
+            if i0<3
+                str_commond = ['MA = ',comm{i0},'; M.',comm_str{i0},'(ind_X,1) = sum(MA,2);'];
             else
-                str_commond = ['MA = ',comm{i},'; M.',comm_str{i},'(ind_X,1) = sum(MA,2)-1;'];
+                str_commond = ['MA = ',comm{i0},'; M.',comm_str{i0},'(ind_X,1) = sum(MA,2)-1;'];
             end
 %             disp(str_commond)
             eval(str_commond);
         end
-        
-        
+       
     end
 end
 

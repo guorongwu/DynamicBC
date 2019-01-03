@@ -64,39 +64,54 @@ else % ROIwise, i.e. mat/text file, for further auto select the mat/text file, i
 % %     end
 end
 
-save_info.flag_par = matlabpool('size');
+% save_info.flag_par = matlabpool('size');
 
 if any([R1([1 3]); (R1(2)&R2(3))]) % seed FC/ FCD
+    %% read fMRI data to check dimension 
+    sub_dir = strcat(fullfile(DataProcessDir,SubjectID{1}));
+    niiname = dir(fullfile(sub_dir,'*.nii'));
+    if isempty(niiname)
+        niiname = dir(fullfile(sub_dir,'*.img'));
+        if isempty(niiname)             
+            error(['no NIFTI file exist in: ',sub_dir]);
+        end
+    end
+    niifile0 = fullfile(sub_dir,niiname(1).name);
+    v0 = spm_vol(niifile0);
     %% read mask/label file. 
     if R2(1) % default mask
         fprintf('Generate Human brain mask from SPM default mask...\n')
         default_mask = fullfile(spm('Dir'),'apriori','brainmask.nii');
         if ~exist(default_mask)
-            default_mask = fullfile(spm('Dir'),'tpm','brainmask.nii');
+            default_mask = fullfile(spm('Dir'),'tpm','mask_ICV.nii');
             if ~exist(default_mask)
                 error('No human brain mask could be found! SPM should be installed.')
             end
         end        
-        sub_dir = strcat(fullfile(DataProcessDir,SubjectID{1}));
-        niiname = dir(fullfile(sub_dir,'*.nii'));
-        if isempty(niiname)
-            niiname = dir(fullfile(sub_dir,'*.img'));
-            if isempty(niiname)             
-                error(['no NIFTI file exist in: ',sub_dir]);
-            end
-        end
-        niifile0 = fullfile(sub_dir,niiname(1).name);
-        v0 = spm_vol(niifile0);
         mask_label_template = fullfile(save_dir,'brain_mask.nii');
-        wgr_Reslice(default_mask,mask_label_template,v0(1).dim,0,niifile0);  
+        DynamicBC_Reslice(default_mask,mask_label_template,0,niifile0);  
         fprintf('Brain mask: %s\n', mask_label_template)
     else
         mask_label_template = get(E.ed_mrs_files,'string');
     end
     
     vm = spm_vol(mask_label_template);
-    mask_label_dat = spm_read_vols(vm);
-    save_info.v = vm ; %% nifti header information
+    if any(v0(1).dim-vm.dim)
+        fprintf('%s, DIM:[%d,%d,%d]\n',niifile0,v0(1).dim)
+        fprintf('Mask/Template: %s, DIM:[%d,%d,%d]\n',mask_label_template,vm(1).dim)
+        fprintf('(Nearest Neighbour)Reslice Mask/template ... \n')
+        [fpath_template,name,ext] = fileparts(mask_label_template);
+        tmpext = strfind(ext,','); % 'abc.nii,1'
+        if ~isempty(tmpext)
+            ext = ext(1:tmpext(1)-1);
+        end
+        mask_label_template0 = fullfile(fpath_template,[name,'_resliced',ext]);
+        DynamicBC_Reslice(mask_label_template,mask_label_template0,0,niifile0);
+        set(E.ed_mrs_files,'string',mask_label_template0);
+        vm = spm_vol(mask_label_template0);
+    end
+    mask_label_dat = spm_read_vols(vm(1));
+    save_info.v = vm(1) ; %% nifti header information
     save_info.v.dt = [16,0];
     save_info.v.n = [1 1];
     mask_label_dat(isnan(mask_label_dat))=0;
@@ -105,7 +120,22 @@ if any([R1([1 3]); (R1(2)&R2(3))]) % seed FC/ FCD
     if R1(1)
         if flag_seed_ROI(1)
             seed_ROI_mask = get(E.rd_seed_ROI(1),'TooltipString');
-            seed_ROI_data = spm_read_vols(spm_vol(seed_ROI_mask));
+            vs = spm_vol(seed_ROI_mask);
+            if any(v0(1).dim-vs(1).dim)
+                fprintf('%s, DIM:[%d,%d,%d]\n',niifile0,v0(1).dim)
+                fprintf('Seed ROI mask %s, DIM:[%d,%d,%d]\n',seed_ROI_mask,vs(1).dim)
+                fprintf('(Nearest Neighbour)Reslice ROI mask ... \n')
+                [fpath_seed,name,ext] = fileparts(seed_ROI_mask);
+                tmpext = strfind(ext,',');
+                if ~isempty(tmpext)
+                    ext = ext(1:tmpext(1)-1);
+                end
+                seed_ROI_mask0 = fullfile(fpath_seed,[name,'_resliced',ext]);
+                DynamicBC_Reslice(seed_ROI_mask,seed_ROI_mask0,0,niifile0);
+            else
+                seed_ROI_mask0 = seed_ROI_mask;
+            end
+            seed_ROI_data = spm_read_vols(spm_vol(seed_ROI_mask0));
             seed_ROI_data(isnan(seed_ROI_data))=0;
             save_info.seed_index = find(seed_ROI_data>0);
         else
@@ -189,7 +219,7 @@ if any([R1([1 3]); (R1(2)&R2(3))]) % seed FC/ FCD
         else
             nobs = num_volume;
             tmp_dat = spm_read_vols(spm_vol(fullfile(sub_dir,niiname(1).name)));
-            data = zeros(prod(size(tmp_dat)),nobs); %nvar*nobs
+            data = zeros(numel(tmp_dat),nobs); %nvar*nobs
             for j=1:nobs
                 niifile = fullfile(sub_dir,niiname(j).name);
                 v = spm_vol(niifile);
@@ -242,7 +272,7 @@ if any([R1([1 3]); (R1(2)&R2(3))]) % seed FC/ FCD
                 save_info.nii_mat_name = fullfile(save_dir,SubjectID{isub}, [SubjectID{isub},'_',str_fc_ec,'.nii']);
             end
             
-        elseif R1(2)&R2(3) % ROIwise-label
+        elseif R1(2)&&R2(3) % ROIwise-label
 
             save_info.flag_1n = 0;
             save_info.seed_index = [] ;
@@ -280,7 +310,7 @@ else % ROI-wise, i.e. txt or mat file
     for isub=1:SubjectNum
         fprintf('Running subject %4.0f (all %4.0f subjects)\n',isub,SubjectNum);
         subj_file = strcat(tx_mat_file(isub,:));
-        [sub_path, SubjectID{isub}, ext]= fileparts(subj_file);
+        [~, SubjectID{isub}, ~]= fileparts(subj_file);
         if isub>1
            TF = strcmpi(SubjectID{isub},SubjectID(1:isub-1));
            if sum(TF(:))>0
@@ -331,7 +361,11 @@ else % ROI-wise, i.e. txt or mat file
             DynamicBC_fls_FC(ROI_sig,mu,save_info);
         end
     end
-    xlswrite(fullfile(save_dir,'Subject_ID_information_txt_mat.xls'),SubID);
+    try
+        xlswrite(fullfile(save_dir,'Subject_ID_information_txt_mat.xls'),SubID);
+    catch
+        save(fullfile(save_dir,'Subject_ID_information.mat'),'SubID');
+    end
 end
 
 set(F.pb_run_check(1),'backgroundc',get(F.hfig,'color'));
@@ -340,37 +374,18 @@ delete(F.hfig);
 
 %% subfunction
 
-function wgr_Reslice(PI,PO,NewVoxSize,hld,TargetSpace)
+function DynamicBC_Reslice(PI,PO,hld,TargetSpace)
 %   PI - input filename
 %   PO - output filename
-%   NewVoxSize - 1x3 matrix of new vox size.
 %   hld - interpolation method. 0: Nearest Neighbour. 1: Trilinear.
 %   TargetSpace - Define the target space. 'ImageItself': defined by the image itself (corresponds  to the new voxel size); 'XXX.img': defined by a target image 'XXX.img' (the NewVoxSize parameter will be discarded in such a case).
-if nargin<=4
-    TargetSpace='ImageItself';
-end
 
-if ~strcmpi(TargetSpace,'ImageItself')
-    headIN = spm_vol(TargetSpace) ;
-    headIN = headIN(1);
-    dataIN = spm_read_vols(headIN);
-    mat=headIN.mat;
-    dim=headIN.dim;
-else
-    headIN = spm_vol(PI) ;
-    headIN = headIN(1);
-    dataIN = spm_read_vols(headIN);
-    origin=headIN.mat(1:3,4);
-    origin=origin+[headIN.mat(1,1);headIN.mat(2,2);headIN.mat(3,3)]-[NewVoxSize(1)*sign(headIN.mat(1,1));NewVoxSize(2)*sign(headIN.mat(2,2));NewVoxSize(3)*sign(headIN.mat(3,3))];
-    origin=round(origin./NewVoxSize').*NewVoxSize';
-    mat = [NewVoxSize(1)*sign(headIN.mat(1,1))                 0                                   0                       origin(1)
-        0                         NewVoxSize(2)*sign(headIN.mat(2,2))              0                       origin(2)
-        0                                      0                      NewVoxSize(3)*sign(headIN.mat(3,3))  origin(3)
-        0                                      0                                   0                          1      ];
+headIN = spm_vol(TargetSpace) ;
+headIN = headIN(1);
+dataIN = spm_read_vols(headIN);
+mat=headIN.mat;
+dim=headIN.dim;
 
-    dim=(headIN.dim-1).*diag(headIN.mat(1:3,1:3))';
-    dim=floor(abs(dim./NewVoxSize))+1;
-end
 VI          = spm_vol(PI);
 VI   = VI(1);
 VO          = VI;

@@ -7,24 +7,30 @@ step=ceil(window-overlap*window); % 10% overlap
 if ~step||step<0
     error('you must reset overlap size!');
 end
+if window>nobs
+   fprintf('There are only %d time points < window size = %d',nobs, window)
+   error('you must reset window size!');
+end
 if window==nobs
     slides=1;
 else
-    slides=floor((nobs-window)/step);
+%     slides=floor((nobs-window)/step);
+    slides=floor((nobs-window)/step)+1;
 end
-num0 = ceil(log10(slides))+1;
+num0 = ceil(log10(slides))+2;
 GC = cell(slides,1); 
 t1=1-step;
 t2=window-step;
 %sliding window
 nii_name = cell(slides,4);
+save_info.flag_par = 1; % default open par
 for k=1:slides
     t1=t1+step;
     t2=t2+step;
 %     if k==slides
 %         t2 = nobs;
 %     end
-%     disp([t1 t2])
+    disp([t1 t2])
     dat = data(t1:t2,:);
     if save_info.slw_alignment==1
         k1 = t1;
@@ -40,8 +46,10 @@ for k=1:slides
         data_save = zeros(save_info.v.dim);
         if ~save_info.flag_1n % GCD
             pathstr_gcd = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'GCD_map',filesep));
-            try
-                mkdir(pathstr_gcd)
+            if k==1
+                try
+                    mkdir(pathstr_gcd)
+                end
             end
             flag_gcd=1;
             [GCM] = DynamicBC_PWGC_SLW(dat,nvar,save_info.flag_1n,flag_gcd,pvalue,order,[],save_info.flag_par);
@@ -79,10 +87,13 @@ for k=1:slides
             
         else  %if save_info.flag_1n % seed GC
             pathstr_g = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'seed_GCmap',filesep));
-            try
-                mkdir(pathstr_g)
+            if k==1
+                try
+                    mkdir(pathstr_g)
+                end
             end
             flag_gcd=0;
+            
             [GCM] = DynamicBC_PWGC_SLW(dat,nvar,save_info.flag_1n, flag_gcd, pvalue,order,save_info.seed_signal(t1:t2,:),save_info.flag_par);
             
             Matrix = zeros(nvar,2);
@@ -125,38 +136,74 @@ if save_info.flag_nii % save nii: seed GC,GCD.
             mkdir(pathstr_v)
         end
         str_typ = {'_In_bin_variance','_In_wei_variance','_Out_bin_variance','_Out_wei_variance'};
+        str_typ1 = {'_In_bin_std','_In_wei_std','_Out_bin_std','_Out_wei_std'};
+        str_typ2 = {'_In_bin_mean','_In_wei_mean','_Out_bin_mean','_Out_wei_mean'};
+        str_typ3 = {'_In_bin_CV','_In_wei_CV','_Out_bin_CV','_Out_wei_CV'};
         for j=1:4
-            data = zeros(slides, nvar);
+            data0 = zeros(slides, nvar);
             for k=1:slides
                 v = spm_vol(nii_name{k,j}.fname);
                 dat = spm_read_vols(v);
-                data(k,:) = dat(save_info.index);
+                data0(k,:) = dat(save_info.index);
             end
-            data = var(data,0,1);
+            data = var(data0,0,1);
             v.fname = fullfile(pathstr_v,[name,str_typ{j},ext]);
             data_save(save_info.index) = data; 
             spm_write_vol(v,data_save);
+            
+            datas = std(data0,0,1);
+            v.fname = fullfile(pathstr_v,[name,str_typ1{j},ext]);
+            data_save(save_info.index) = datas; 
+            spm_write_vol(v,data_save);
+            
+            datam = mean(data0,1);
+            v.fname = fullfile(pathstr_v,[name,str_typ2{j},ext]);
+            data_save(save_info.index) = datam; 
+            spm_write_vol(v,data_save);
+            
+            cv = datas./datam;
+            v.fname = fullfile(pathstr_v,[name,str_typ3{j},ext]);
+            data_save(save_info.index) = cv; 
+            spm_write_vol(v,data_save);
         end
     else
-        pathstr_v = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'GC_Variance',filesep));
-        try
-            mkdir(pathstr_v)
-        end
-        for j=1:2
-            data = zeros(slides, nvar);
-            for k=1:slides
-                v = spm_vol(nii_name{k,j}.fname);
-                dat = spm_read_vols(v);
-                data(k,:) = dat(save_info.index);
+        if slides>1 
+            pathstr_v = strrep(pathstr,save_info.save_dir,fullfile(save_info.save_dir,'GC_Variance',filesep));
+            try
+                mkdir(pathstr_v)
             end
-            data = var(data,0,1);
-            if j==1
-                v.fname = fullfile(pathstr_v,[name,'_Out_variance',ext]);
-            else
-                v.fname = fullfile(pathstr_v,[name,'_IN_variance',ext]);
+            for j=1:2
+                data0 = zeros(slides, nvar);
+                for k=1:slides
+                    v = spm_vol(nii_name{k,j}.fname);
+                    dat = spm_read_vols(v);
+                    data0(k,:) = dat(save_info.index);
+                end
+                
+                if j==1
+                    postfix = '_Out';
+                else
+                    postfix = '_IN';
+                end
+                data = var(data0,0,1);
+                v.fname = fullfile(pathstr_v,[name,postfix,'_variance',ext]);
+                data_save(save_info.index) = data; 
+                spm_write_vol(v,data_save);
+                
+                datas = std(data0,0,1);
+                v.fname = fullfile(pathstr_v,[name,postfix,'_std',ext]);
+                data_save(save_info.index) = datas; 
+                spm_write_vol(v,data_save);
+                
+                datam = mean(data0,1);
+                v.fname = fullfile(pathstr_v,[name,postfix,'_mean',ext]);
+                data_save(save_info.index) = datam; 
+                spm_write_vol(v,data_save);
+                
+                v.fname = fullfile(pathstr_v,[name,postfix,'_CV',ext]);
+                data_save(save_info.index) = datas./datam; 
+                spm_write_vol(v,data_save);
             end
-            data_save(save_info.index) = data; 
-            spm_write_vol(v,data_save);
         end
     end
     
