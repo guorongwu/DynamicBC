@@ -2,6 +2,19 @@ function DynamicBC_clustermaps(num_clusters,outputd,Maskimg,subjdir,dmethod,filt
 outputd = strcat(outputd);
 subjdir = strcat(subjdir);
 SubFold = dir(subjdir); SubFold(1:2)=[];
+if isempty(SubFold)
+    error(sprintf('No subject data in %s\n',subjdir))
+    return;
+else
+    SubFold(1:2)=[];
+    tmp=[];
+    for i=1:length(SubFold) %check for mac os
+        if ~SubFold(i).isdir
+            tmp = [tmp i];
+        end
+    end
+    SubFold(tmp)=[]; clear tmp
+end
 NumOfSubFold = length(SubFold);
 filter_str2 = strrep(strrep(filter_str,'*',''),'_','');
 if isempty(filter_str2)

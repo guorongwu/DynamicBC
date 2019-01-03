@@ -201,10 +201,10 @@ end
 function wgr_estimatClu_call(varargin)
 D = varargin{3};  % Get structure.
 sty = get(D.tx_fs,'style');
-switch sty;
-        case 'pushbutton'
-            set(D.tx_fs,'style','popup');
-            set(D.tx_fs,'string',{'Fixed','Estimate'});
+switch sty
+    case 'pushbutton'
+        set(D.tx_fs,'style','popup');
+        set(D.tx_fs,'string',{'Fixed','Estimate'});
 end
 
 end
@@ -213,7 +213,6 @@ function []=wgr_run_call(varargin)
 D = varargin{3};  % Get structure.
 flag_datatype = get(D.data_type,'val');
 Datafold = get(D.ed_data,'string');
-SubFold = dir(Datafold);
 outputd = get(D.ed_outdir,'string');
 k = str2num(get(D.ed_fs,'string'));  % cluster number
 k = unique(k);
@@ -257,11 +256,11 @@ end
 function []=wgr_plot_call(varargin)
 D = varargin{3};  % Get structure.
 fpath = get(D.ed_outdir,'string');
-matfile0 = spm_select('FPListRec',fpath,'^cluster_index.*\.mat$')
+matfile0 = spm_select('FPListRec',fpath,'^cluster_index.*\.mat$');
 ll = length('cluster_index');
 for imat=1:size(matfile0,1)
     matfile = strcat(matfile0(imat,:));
-    [fpath0,name,ext] = fileparts(matfile);
+    [fpath0,name,~] = fileparts(matfile);
     if length(name)>ll
         strio = [name(ll+2:end)];
     else
@@ -443,7 +442,7 @@ for jj = 1:k
         end_t = [end_t; Nwin];
     end
     MDT(jj) = mean(end_t-start_t);
-    if isempty(end_t) & isempty(start_t)
+    if isempty(end_t) && isempty(start_t)
         MDT(jj) = 0;
     end
 end

@@ -223,7 +223,20 @@ set(D.sub_select,'callback',{@wgr_sub_select_call,D});
 function []=wgr_run_call(varargin)
 D = varargin{3};  % Get structure.
 Datafold = get(D.ed_data,'string');
-SubFold = dir(Datafold); if isempty(SubFold);return;else, SubFold(1:2)=[];end
+SubFold = dir(Datafold); 
+if isempty(SubFold)
+    error(sprintf('No subject data in %s\n',Datafold))
+    return;
+else
+    SubFold(1:2)=[];
+    tmp=[];
+    for i=1:length(SubFold) %check for mac os
+        if ~SubFold(i).isdir
+            tmp = [tmp i];
+        end
+    end
+    SubFold(tmp)=[]; clear tmp
+end
 outputd = get(D.ed_outdir,'string');
 Fs = str2num(get(D.ed_fs,'string'));
 flag_datatype = get(D.data_type,'val');
@@ -520,7 +533,6 @@ function DynamicBC_Reslice(PI,PO,hld,TargetSpace)
 
 headIN = spm_vol(TargetSpace) ;
 headIN = headIN(1);
-dataIN = spm_read_vols(headIN);
 mat=headIN.mat;
 dim=headIN.dim;
 

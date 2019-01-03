@@ -1,6 +1,19 @@
 function [save_dir,IDX_subj]=DynamicBC_clustermatrix(num_clusters,outputd,matname,subjdir,dmethod,flag_estimate)
 evalstr = ['mats = ',matname,';'];
 SubFold = dir(subjdir); SubFold(1:2)=[];
+if isempty(SubFold)
+    error(sprintf('No subject data in %s\n',subjdir))
+    return;
+else
+    SubFold(1:2)=[];
+    tmp=[];
+    for i=1:length(SubFold) %check for mac os
+        if ~SubFold(i).isdir
+            tmp = [tmp i];
+        end
+    end
+    SubFold(tmp)=[]; clear tmp
+end
 NumOfSubFold = size(SubFold,1);
 alen = 0; 
 inums = 1; Subindex={}; 
