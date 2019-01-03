@@ -6,8 +6,7 @@ Dynamic brain connectome (DynamicBC) analysis toolbox is a Matlab toolbox to cal
 
 Documentation
 -------------
-Please find more complete documentation for DynamicBC at
-http://restfmri.net/forum/DynamicBC (including PDF Manual)
+A detailed manual is included in the toolbox.
 
 **Citation**
 --------
