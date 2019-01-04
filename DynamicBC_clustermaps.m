@@ -6,7 +6,6 @@ if isempty(SubFold)
     error(sprintf('No subject data in %s\n',subjdir))
     return;
 else
-    SubFold(1:2)=[];
     tmp=[];
     for i=1:length(SubFold) %check for mac os
         if ~SubFold(i).isdir
