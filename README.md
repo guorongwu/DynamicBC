@@ -11,4 +11,4 @@ A detailed manual is included in the toolbox.
 **Citation**
 --------
 
-Wei Liao,#* Guo-Rong Wu,#* Qiang Xu,* Gong-Jun Ji, Zhiqiang Zhang, Yu-Feng Zang, and Guangming Lu (2014). _DynamicBC: a matlab toolbox for dynamic brain connectome analysis. Brain Connectivity, 4(10), 780-90. [PDF](https://github.com/guorongwu/DynamicBC/blob/master/doc/2014_DynamicBC.pdf)_ (#: corresponding author)
+Wei Liao,#* Guo-Rong Wu,#* Qiang Xu,* Gong-Jun Ji, Zhiqiang Zhang, Yu-Feng Zang, and Guangming Lu (2014). _DynamicBC: a matlab toolbox for dynamic brain connectome analysis. Brain Connectivity, 4(10), 780-90. [PDF](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4268585/)_ (#: corresponding author)
